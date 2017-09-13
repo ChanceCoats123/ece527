@@ -65,6 +65,7 @@
 #include "xparameters.h"
 #include "xgpio.h"
 #include "xil_printf.h"
+#include "sleep.h"
 
 /************************** Constant Definitions *****************************/
 
@@ -146,10 +147,9 @@ XGpio Gpio; /* The Instance of the GPIO Driver */
 int main(void)
 {
 	int Status;
-	u8 data = 0xF0;
+	u8 data;
 	u8 temp;
 	int mode = 0;
-	volatile int Delay;
 
 	/* Initialize the GPIO driver */
 	Status = XGpio_Initialize(&Gpio, GPIO_EXAMPLE_DEVICE_ID);
@@ -158,39 +158,37 @@ int main(void)
 		return XST_FAILURE;
 	}
 
-	/* Set the direction for all signals as inputs except the LED output */
-	//XGpio_SetDataDirection(&Gpio, LED_CHANNEL, ~LED);
-	//XGpio_SetDataDirection(&Gpio, SW_CHANNEL, ~SW);
-
-	/* Loop forever blinking the LED */
-
 	while (1) {
 		/* Read from the switches */
 		data = XGpio_DiscreteRead(&Gpio, SW_CHANNEL);
-
+		/* Decide what to output based upon the current mode. */
 		switch(mode)
 		{
 			case 0:
-				/* Do nothing here. */
+				/* Output the switch data directly. */
 				break;
 			case 1:
+				/* Shift the input right by 2 bits. */
 				data = data >> 2;
 				break;
 			case 2:
-				temp = (data & 0xE0) >> 5;
-				data = data << 3;
-				data |= temp;
+				/* Circularly shift the output left by 3 bits. */
+				temp = (data & 0xE0) >> 5; // Mask the top 3 bits then shift right by 5 bit places.
+				data = data << 3; // Shift data left by 3 bit places.
+				data |= temp; // OR with the temp bits.
 				break;
 			case 3:
+				/* Output the complement of the input. */
 				data = ~data;
 				break;
 		}
 
-		/* Set the LED to High */
+		/* Write to the LEDs with the modified data. */
 		XGpio_DiscreteWrite(&Gpio, LED_CHANNEL, data);
 
-		/* Wait a small amount of time so the LED is visible */
-		for (Delay = 0; Delay < LED_DELAY; Delay++);
+		/* Sleep for one second. */
+		sleep(1);
+		/* Increment the mode and return to 0 if the modes have been cycled through. */
 		mode++;
 		if(mode == 4)
 			mode = 0;
